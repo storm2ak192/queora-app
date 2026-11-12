@@ -11,7 +11,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0f1115"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.queora.downloads"
@@ -32,12 +34,19 @@
       ]
     },
     "plugins": [
-      ["expo-notifications", { "sounds": [], "mode": "production" }]
+      [
+        "expo-notifications",
+        {
+          "sounds": [],
+          "mode": "production"
+        }
+      ]
     ],
     "extra": {
       "eas": {
-        "projectId": "REPLACE_AFTER_eas_init"
+        "projectId": "6bb340d0-cbeb-45c1-9089-c362bc10e524"
       }
-    }
+    },
+    "owner": "storm2ak192s-team"
   }
 }

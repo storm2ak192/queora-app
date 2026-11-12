@@ -23,7 +23,6 @@ export function enqueueDownload(id: string) {
   pumpQueue();
 }
 
-/** Alias used by DownloadContext */
 export function startDownload(id: string) {
   enqueueDownload(id);
 }
@@ -84,12 +83,21 @@ async function ensureLocalDownloadDir(): Promise<string> {
   return dir;
 }
 
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
+function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  // @ts-ignore
-  return typeof btoa !== 'undefined' ? btoa(binary) : Buffer.from(bytes).toString('base64');
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  // btoa is available in Hermes / RN
+  return btoa(binary);
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 async function probe(url: string, signal?: AbortSignal) {
@@ -137,9 +145,8 @@ async function downloadPart(
   if (!res.ok && res.status !== 206) {
     throw new Error(`Part failed: HTTP ${res.status}`);
   }
-  const buf = await res.arrayBuffer();
-  const b64 = arrayBufferToBase64(buf);
-  await FileSystem.writeAsStringAsync(dest, b64, {
+  const buf = new Uint8Array(await res.arrayBuffer());
+  await FileSystem.writeAsStringAsync(dest, bytesToBase64(buf), {
     encoding: FileSystem.EncodingType.Base64,
   });
   onBytes(buf.byteLength);
@@ -154,7 +161,7 @@ async function maybeCopyToSaf(localPath: string, filename: string) {
     if (!SAF?.createFileAsync) return;
     const lower = filename.toLowerCase();
     let mime = 'application/octet-stream';
-    if (lower.endsWith('.mp')) mime = 'video/mp4';
+    if (lower.endsWith('.mp4')) mime = 'video/mp4';
     else if (lower.endsWith('.pdf')) mime = 'application/pdf';
     else if (lower.endsWith('.zip')) mime = 'application/zip';
     else if (lower.endsWith('.mp3')) mime = 'audio/mpeg';
@@ -234,16 +241,13 @@ async function runDownload(id: string) {
 
       const ordered = (await listParts(id)).sort((a, b) => a.partIndex - b.partIndex);
       const chunks: Uint8Array[] = [];
-      let totalLen = 
+      let totalLen = 0;
       for (const p of ordered) {
         const dest = `${partDir}part_${p.partIndex}.bin`;
         const b64 = await FileSystem.readAsStringAsync(dest, {
           encoding: FileSystem.EncodingType.Base64,
         });
-        // @ts-ignore
-        const binary = typeof atob !== 'undefined' ? atob(b64) : Buffer.from(b64, 'base64').toString('binary');
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const bytes = base64ToBytes(b64);
         chunks.push(bytes);
         totalLen += bytes.length;
       }
@@ -253,9 +257,8 @@ async function runDownload(id: string) {
         merged.set(c, offset);
         offset += c.length;
       }
-      const mergedB64 = arrayBufferToBase64(merged.buffer);
       const finalPath = `${dir}${d.filename}`;
-      await FileSystem.writeAsStringAsync(finalPath, mergedB64, {
+      await FileSystem.writeAsStringAsync(finalPath, bytesToBase64(merged), {
         encoding: FileSystem.EncodingType.Base64,
       });
 
@@ -272,10 +275,9 @@ async function runDownload(id: string) {
     } else {
       const res = await fetch(d.url, { signal: controller.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const buf = await res.arrayBuffer();
-      const b64 = arrayBufferToBase64(buf);
+      const buf = new Uint8Array(await res.arrayBuffer());
       const finalPath = `${dir}${d.filename}`;
-      await FileSystem.writeAsStringAsync(finalPath, b64, {
+      await FileSystem.writeAsStringAsync(finalPath, bytesToBase64(buf), {
         encoding: FileSystem.EncodingType.Base64,
       });
       await updateDownload(id, {
