@@ -73,10 +73,100 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Ensure Expo project + projectId (phone-friendly, no local eas init)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -e
+          python3 << 'PY'
+          import json, os, urllib.request, uuid
+          from pathlib import Path
+
+          token = os.environ["EXPO_TOKEN"].strip()
+          if not token:
+              raise SystemExit("EXPO_TOKEN secret is empty")
+
+          def gql(query, variables=None):
+              body = json.dumps({"query": query, "variables": variables or {}}).encode()
+              req = urllib.request.Request(
+                  "https://api.expo.dev/graphql",
+                  data=body,
+                  headers={
+                      "Authorization": f"Bearer {token}",
+                      "Content-Type": "application/json",
+                      "User-Agent": "queora-ci",
+                  },
+                  method="POST",
+              )
+              with urllib.request.urlopen(req, timeout=60) as res:
+                  data = json.load(res)
+              if data.get("errors"):
+                  raise RuntimeError(data["errors"])
+              return data["data"]
+
+          me = gql("{ me { id username accounts { id name } } }")
+          print("expo user:", me["me"]["username"])
+          account_id = me["me"]["accounts"][0]["id"]
+
+          # Find existing app by slug, or create one
+          apps = gql(
+              """query($accountId: ID!) {
+                account { byId(accountId: $accountId) {
+                  apps(offset: 0, limit: 50) { id fullName slug }
+                }}
+              }""",
+              {"accountId": account_id},
+          )
+          found = None
+          for a in apps["account"]["byId"]["apps"]:
+              if a.get("slug") == "queora":
+                  found = a
+                  break
+
+          if found:
+              project_id = found["id"]
+              print("using existing project", found.get("fullName"), project_id)
+          else:
+              # createApp mutation (Expo GraphQL)
+              created = gql(
+                  """mutation($accountId: ID!, $projectName: String!, $privacy: AppPrivacy!) {
+                    app {
+                      createApp(accountId: $accountId, projectName: $projectName, privacy: $privacy) {
+                        id
+                        slug
+                        fullName
+                      }
+                    }
+                  }""",
+                  {
+                      "accountId": account_id,
+                      "projectName": "queora",
+                      "privacy": "UNLISTED",
+                  },
+              )
+              app = created["app"]["createApp"]
+              project_id = app["id"]
+              print("created project", app.get("fullName"), project_id)
+
+          # Write into app.json for this job
+          path = Path("app.json")
+          cfg = json.loads(path.read_text())
+          cfg.setdefault("expo", {}).setdefault("extra", {}).setdefault("eas", {})["projectId"] = project_id
+          # owner helps EAS resolve the project
+          cfg["expo"]["owner"] = me["me"]["username"]
+          path.write_text(json.dumps(cfg, indent=2) + "\n")
+          print("app.json projectId set")
+          PY
+
+          # Also try CLI init as a safety net (non-interactive)
+          npx eas-cli@latest init --non-interactive --force || true
+
       - name: EAS build (preview APK)
-        run: eas build --platform android --profile preview --non-interactive --wait
+        run: eas build --platform android --profile preview --non-interactive --wait --no-wait=false
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Note
-        run: echo "Download the APK from the EAS build page linked in the job log."
+        run: |
+          echo "When the job finishes, open the EAS build URL printed above and download the APK."
+          echo "No computer / local eas init required."
