@@ -11,6 +11,7 @@ on:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     defaults:
       run:
         working-directory: app
@@ -20,6 +21,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
       - name: Generate placeholder assets if missing
         run: |
@@ -63,64 +73,36 @@ jobs:
                   print('wrote',p)
           PY
 
-      - name: Install app dependencies
+      - name: Install JS dependencies
         run: npm install
 
       - name: Metro preflight
         run: npx expo export --platform android --output-dir /tmp/expo-out
 
-      - name: Install EAS CLI
-        run: npm install -g eas-cli
+      - name: Expo prebuild (generate android/)
+        run: npx expo prebuild --platform android --non-interactive --clean
 
-      - name: Verify Expo auth + projectId
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      - name: Gradle assembleRelease
+        working-directory: app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace --info 2>&1 | tee /tmp/gradle.log
+          # Keep last 200 lines of log as summary
+          tail -n 200 /tmp/gradle.log
+
+      - name: Locate APK
+        id: apk
         run: |
           set -e
-          eas whoami
-          python3 - <<'PY'
-          import json,sys
-          from pathlib import Path
-          c=json.loads(Path('app.json').read_text())
-          pid=c.get('expo',{}).get('extra',{}).get('eas',{}).get('projectId')
-          print('projectId=',pid)
-          if not pid: sys.exit('missing projectId')
-          PY
+          APK=$(find android -name '*.apk' -type f | head -n 1)
+          echo "Found: $APK"
+          ls -la "$APK"
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
 
-      - name: EAS build (preview APK)
-        id: easbuild
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas build --platform android --profile preview --non-interactive --wait
-
-      - name: Dump last build error details
-        if: failure()
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: |
-          echo "=== eas build:list ==="
-          eas build:list --platform android --limit 1 --non-interactive --json > /tmp/builds.json || true
-          cat /tmp/builds.json || true
-          python3 - <<'PY'
-          import json,subprocess,os
-          try:
-              data=json.load(open('/tmp/builds.json'))
-              builds=data if isinstance(data,list) else data.get('builds') or data.get('data') or []
-              if isinstance(data,dict) and 'id' in data:
-                  builds=[data]
-              if not builds and isinstance(data,list):
-                  builds=data
-              bid=None
-              if builds:
-                  b=builds[0]
-                  bid=b.get('id') or b.get('buildId')
-                  print('status', b.get('status'))
-                  print('error', b.get('error'))
-                  print('message', b.get('message'))
-                  print('id', bid)
-              if bid:
-                  out=subprocess.check_output(['eas','build:view',bid,'--json','--non-interactive'], env=os.environ, text=True, timeout=60)
-                  print(out[:15000])
-          except Exception as e:
-              print('dump failed', e)
-          PY
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: queora-apk
+          path: app/${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+          retention-days: 14
