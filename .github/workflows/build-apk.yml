@@ -8,6 +8,10 @@ on:
       - 'app/**'
       - '.github/workflows/build-apk.yml'
 
+env:
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -28,8 +32,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android licenses
+        run: |
+          yes | sdkmanager --licenses >/tmp/sdk-licenses.txt || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" || true
+        working-directory: .
 
       - name: Generate placeholder assets if missing
         run: |
@@ -86,9 +93,7 @@ jobs:
         working-directory: app/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --stacktrace --info 2>&1 | tee /tmp/gradle.log
-          # Keep last 200 lines of log as summary
-          tail -n 200 /tmp/gradle.log
+          ./gradlew assembleRelease --stacktrace
 
       - name: Locate APK
         id: apk
