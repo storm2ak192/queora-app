@@ -1,7 +1,7 @@
 {
   "name": "queora",
   "version": "0.1.0",
-  "main": "expo/AppEntry.js",
+  "main": "index.js",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
