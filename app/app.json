@@ -23,17 +23,8 @@
         "backgroundColor": "#0f1115"
       },
       "package": "app.queora.downloads",
-      "versionCode": 1,
-      "permissions": [
-        "INTERNET",
-        "ACCESS_NETWORK_STATE",
-        "POST_NOTIFICATIONS",
-        "WAKE_LOCK"
-      ]
+      "versionCode": 2
     },
-    "plugins": [
-      "expo-notifications"
-    ],
     "extra": {
       "eas": {
         "projectId": "6bb340d0-cbeb-45c1-9089-c362bc10e524"

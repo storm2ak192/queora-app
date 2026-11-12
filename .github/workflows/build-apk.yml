@@ -66,36 +66,61 @@ jobs:
       - name: Install app dependencies
         run: npm install
 
-      - name: Metro preflight (surface JS errors in Actions log)
+      - name: Metro preflight
         run: npx expo export --platform android --output-dir /tmp/expo-out
 
       - name: Install EAS CLI
         run: npm install -g eas-cli
 
-      - name: Login check + create/link Expo project
+      - name: Verify Expo auth + projectId
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -e
           eas whoami
           python3 - <<'PY'
-          import json
+          import json,sys
           from pathlib import Path
-          p = Path("app.json")
-          c = json.loads(p.read_text())
-          pid = c.get("expo", {}).get("extra", {}).get("eas", {}).get("projectId")
-          print("projectId=", pid)
-          if not pid or "REPLACE" in str(pid):
-              raise SystemExit("missing projectId")
+          c=json.loads(Path('app.json').read_text())
+          pid=c.get('expo',{}).get('extra',{}).get('eas',{}).get('projectId')
+          print('projectId=',pid)
+          if not pid: sys.exit('missing projectId')
           PY
 
       - name: EAS build (preview APK)
+        id: easbuild
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas build --platform android --profile preview --non-interactive --wait
 
-      - name: Show latest builds
-        if: always()
+      - name: Dump last build error details
+        if: failure()
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas build:list --platform android --limit 3 --non-interactive || true
+        run: |
+          echo "=== eas build:list ==="
+          eas build:list --platform android --limit 1 --non-interactive --json > /tmp/builds.json || true
+          cat /tmp/builds.json || true
+          python3 - <<'PY'
+          import json,subprocess,os
+          try:
+              data=json.load(open('/tmp/builds.json'))
+              builds=data if isinstance(data,list) else data.get('builds') or data.get('data') or []
+              if isinstance(data,dict) and 'id' in data:
+                  builds=[data]
+              if not builds and isinstance(data,list):
+                  builds=data
+              bid=None
+              if builds:
+                  b=builds[0]
+                  bid=b.get('id') or b.get('buildId')
+                  print('status', b.get('status'))
+                  print('error', b.get('error'))
+                  print('message', b.get('message'))
+                  print('id', bid)
+              if bid:
+                  out=subprocess.check_output(['eas','build:view',bid,'--json','--non-interactive'], env=os.environ, text=True, timeout=60)
+                  print(out[:15000])
+          except Exception as e:
+              print('dump failed', e)
+          PY

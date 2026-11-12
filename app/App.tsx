@@ -1,3 +1,4 @@
+import 'react-native-gesture-handler';
 import React from 'react';
 import { Pressable, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
