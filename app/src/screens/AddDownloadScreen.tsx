@@ -12,7 +12,7 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useDownloads } from '../services/DownloadContext';
 import { colors, space, type, radius } from '../theme/tokens';
-import { RootStackParamList } from '../../App';
+import type { RootStackParamList } from '../types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Add'>;
 

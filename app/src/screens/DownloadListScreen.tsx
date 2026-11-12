@@ -5,8 +5,8 @@ import { useDownloads } from '../services/DownloadContext';
 import { DownloadCard } from '../components/DownloadCard';
 import { TabStrip } from '../components/TabStrip';
 import { EmptyState } from '../components/EmptyState';
-import { colors, space, radius } from '../theme/tokens';
-import { RootStackParamList } from '../../App';
+import { colors, space } from '../theme/tokens';
+import type { RootStackParamList } from '../types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'List'>;
 

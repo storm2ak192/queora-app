@@ -10,13 +10,7 @@ import { AddDownloadScreen } from './src/screens/AddDownloadScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { colors } from './src/theme/tokens';
 import { DownloadProvider } from './src/services/DownloadContext';
-
-export type RootStackParamList = {
-  List: undefined;
-  Detail: { id: string };
-  Add: undefined;
-  Settings: undefined;
-};
+import type { RootStackParamList } from './src/types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -66,7 +60,11 @@ export default function App() {
               })}
             />
             <Stack.Screen name="Detail" component={DownloadDetailScreen} options={{ title: 'Transfer' }} />
-            <Stack.Screen name="Add" component={AddDownloadScreen} options={{ title: 'New download', presentation: 'modal' }} />
+            <Stack.Screen
+              name="Add"
+              component={AddDownloadScreen}
+              options={{ title: 'New download', presentation: 'modal' }}
+            />
             <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
           </Stack.Navigator>
         </NavigationContainer>

@@ -5,7 +5,7 @@ import * as Sharing from 'expo-sharing';
 import { useDownloads } from '../services/DownloadContext';
 import { formatBytes, formatSpeed, statusLabel } from '../services/urlUtils';
 import { colors, space, type, radius } from '../theme/tokens';
-import { RootStackParamList } from '../../App';
+import type { RootStackParamList } from '../types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Detail'>;
 
@@ -81,9 +81,7 @@ export function DownloadDetailScreen({ route, navigation }: Props) {
         </Pressable>
       </View>
 
-      {item.errorMessage ? (
-        <Text style={styles.error}>{item.errorMessage}</Text>
-      ) : null}
+      {item.errorMessage ? <Text style={styles.error}>{item.errorMessage}</Text> : null}
     </View>
   );
 }
