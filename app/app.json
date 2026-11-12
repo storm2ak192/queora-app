@@ -6,14 +6,13 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#0f1115"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.queora.downloads"
@@ -24,23 +23,16 @@
         "backgroundColor": "#0f1115"
       },
       "package": "app.queora.downloads",
+      "versionCode": 1,
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",
         "POST_NOTIFICATIONS",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_DATA_SYNC",
         "WAKE_LOCK"
       ]
     },
     "plugins": [
-      [
-        "expo-notifications",
-        {
-          "sounds": [],
-          "mode": "production"
-        }
-      ]
+      "expo-notifications"
     ],
     "extra": {
       "eas": {
