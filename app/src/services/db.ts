@@ -204,7 +204,7 @@ export async function deleteDownload(id: string): Promise<void> {
 
 export async function insertParts(parts: DownloadPart[]): Promise<void> {
   const database = await getDb();
-  for (const p of p) {
+  for (const p of parts) {
     await database.runAsync(
       `INSERT OR REPLACE INTO download_parts
         (id, download_id, part_index, start_byte, end_byte, downloaded, status)
