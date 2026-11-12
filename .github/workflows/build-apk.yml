@@ -66,6 +66,9 @@ jobs:
       - name: Install app dependencies
         run: npm install
 
+      - name: Metro preflight (surface JS errors in Actions log)
+        run: npx expo export --platform android --output-dir /tmp/expo-out
+
       - name: Install EAS CLI
         run: npm install -g eas-cli
 
@@ -74,46 +77,16 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -e
-          if [ -z "$EXPO_TOKEN" ]; then
-            echo "EXPO_TOKEN is empty"
-            exit 1
-          fi
           eas whoami
-
-          # Strip invalid placeholder projectId so eas init can write a real one
-          python3 << 'PY'
+          python3 - <<'PY'
           import json
           from pathlib import Path
           p = Path("app.json")
           c = json.loads(p.read_text())
-          expo = c.setdefault("expo", {})
-          extra = expo.setdefault("extra", {})
-          eas = extra.setdefault("eas", {})
-          pid = eas.get("projectId")
-          if not pid or pid == "REPLACE_AFTER_eas_init" or "REPLACE" in str(pid):
-              eas.pop("projectId", None)
-              print("removed placeholder projectId")
-          else:
-              print("existing projectId:", pid)
-          p.write_text(json.dumps(c, indent=2) + "\n")
-          PY
-
-          # Create or link project non-interactively
-          eas init --non-interactive --force || eas project:init --non-interactive || true
-
-          echo "--- app.json after init ---"
-          cat app.json
-
-          # Fail early if still no projectId
-          python3 << 'PY'
-          import json, sys
-          from pathlib import Path
-          c = json.loads(Path("app.json").read_text())
           pid = c.get("expo", {}).get("extra", {}).get("eas", {}).get("projectId")
           print("projectId=", pid)
           if not pid or "REPLACE" in str(pid):
-              print("ERROR: projectId still missing after eas init")
-              sys.exit(1)
+              raise SystemExit("missing projectId")
           PY
 
       - name: EAS build (preview APK)
