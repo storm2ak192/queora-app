@@ -19,7 +19,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Generate placeholder assets if missing
         run: |
@@ -63,28 +63,26 @@ jobs:
                   print('wrote',p)
           PY
 
-      - name: Install dependencies
+      - name: Install app dependencies
         run: npm install
 
-      - name: Setup Expo
-        uses: expo/expo-github-action@v8
-        with:
-          expo-version: latest
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
 
-      - name: Ensure Expo project + projectId (phone-friendly, no local eas init)
+      - name: Ensure Expo project + projectId
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -e
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "EXPO_TOKEN secret is missing"
+            exit 1
+          fi
           python3 << 'PY'
-          import json, os, urllib.request, uuid
+          import json, os, urllib.request
           from pathlib import Path
 
           token = os.environ["EXPO_TOKEN"].strip()
-          if not token:
-              raise SystemExit("EXPO_TOKEN secret is empty")
 
           def gql(query, variables=None):
               body = json.dumps({"query": query, "variables": variables or {}}).encode()
@@ -108,7 +106,6 @@ jobs:
           print("expo user:", me["me"]["username"])
           account_id = me["me"]["accounts"][0]["id"]
 
-          # Find existing app by slug, or create one
           apps = gql(
               """query($accountId: ID!) {
                 account { byId(accountId: $accountId) {
@@ -127,7 +124,6 @@ jobs:
               project_id = found["id"]
               print("using existing project", found.get("fullName"), project_id)
           else:
-              # createApp mutation (Expo GraphQL)
               created = gql(
                   """mutation($accountId: ID!, $projectName: String!, $privacy: AppPrivacy!) {
                     app {
@@ -148,25 +144,25 @@ jobs:
               project_id = app["id"]
               print("created project", app.get("fullName"), project_id)
 
-          # Write into app.json for this job
           path = Path("app.json")
           cfg = json.loads(path.read_text())
           cfg.setdefault("expo", {}).setdefault("extra", {}).setdefault("eas", {})["projectId"] = project_id
-          # owner helps EAS resolve the project
           cfg["expo"]["owner"] = me["me"]["username"]
           path.write_text(json.dumps(cfg, indent=2) + "\n")
           print("app.json projectId set")
           PY
 
-          # Also try CLI init as a safety net (non-interactive)
-          npx eas-cli@latest init --non-interactive --force || true
+          eas init --non-interactive --force || true
 
       - name: EAS build (preview APK)
-        run: eas build --platform android --profile preview --non-interactive --wait --no-wait=false
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas build --platform android --profile preview --non-interactive --wait
 
-      - name: Note
+      - name: Print build info
+        if: always()
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          echo "When the job finishes, open the EAS build URL printed above and download the APK."
-          echo "No computer / local eas init required."
+          echo "Recent builds:"
+          eas build:list --platform android --limit 3 --non-interactive || true
