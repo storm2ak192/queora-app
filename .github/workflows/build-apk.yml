@@ -1,0 +1,82 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '.github/workflows/build-apk.yml'
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate placeholder assets if missing
+        run: |
+          python3 << 'PY'
+          import struct, zlib
+          from pathlib import Path
+          def write_png(path, w, h, rgba_fn):
+              def chunk(tag, data):
+                  return struct.pack('>I', len(data)) + tag + data + struct.pack('>I', zlib.crc32(tag + data) & 0xffffffff)
+              raw = bytearray()
+              for y in range(h):
+                  raw.append(0)
+                  for x in range(w):
+                      r,g,b,a = rgba_fn(x,y,w,h)
+                      raw.extend([r,g,b,a])
+              compressed = zlib.compress(bytes(raw), 9)
+              ihdr = struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)
+              png = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', ihdr) + chunk(b'IDAT', compressed) + chunk(b'IEND', b'')
+              Path(path).parent.mkdir(parents=True, exist_ok=True)
+              Path(path).write_bytes(png)
+          BG=(0x0f,0x11,0x15,255); AC=(0x2e,0xc4,0xb6,255); WH=(240,242,245,255)
+          def icon(x,y,w,h):
+              cx,cy,r=w/2,h/2,w*0.38
+              dx,dy=x-cx,y-cy
+              if dx*dx+dy*dy<=r*r:
+                  if abs(x-cx)<w*0.06 and cy-r*0.35<y<cy+r*0.15: return WH
+                  if y>=cy+r*0.05 and y<=cy+r*0.35:
+                      half=(y-(cy+r*0.05))*0.9
+                      if abs(x-cx)<=half+w*0.04: return WH
+                  return AC
+              return BG
+          def splash(x,y,w,h):
+              cx,cy,r=w/2,h/2,min(w,h)*0.12
+              dx,dy=x-cx,y-cy
+              return AC if dx*dx+dy*dy<=r*r else BG
+          root=Path('assets')
+          for name,size,fn in [('icon.png',(1024,1024),icon),('adaptive-icon.png',(1024,1024),icon),('splash.png',(1284,2778),splash)]:
+              p=root/name
+              if not p.exists():
+                  write_png(p,*size,fn)
+                  print('wrote',p)
+          PY
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: EAS build (preview APK)
+        run: eas build --platform android --profile preview --non-interactive --wait
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Note
+        run: echo "Download the APK from the EAS build page linked in the job log."

@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Queora",
+    "slug": "queora",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f1115"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.queora.downloads"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f1115"
+      },
+      "package": "app.queora.downloads",
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "POST_NOTIFICATIONS",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_DATA_SYNC",
+        "WAKE_LOCK"
+      ]
+    },
+    "plugins": [
+      ["expo-notifications", { "sounds": [], "mode": "production" }]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_AFTER_eas_init"
+      }
+    }
+  }
+}

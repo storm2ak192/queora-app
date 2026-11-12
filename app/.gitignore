@@ -1,0 +1,8 @@
+node_modules/
+.expo/
+dist/
+*.jks
+play-service-account.json
+credentials.json
+.env
+.env.local
